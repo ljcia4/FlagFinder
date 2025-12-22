@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox
 import random
+import os
 
 class Minesweeper:
     def __init__(self, master, rows=9, cols=9, mines=10):
@@ -16,8 +17,9 @@ class Minesweeper:
         self.revealed_cells = 0
 
         try:
-            self.bomb_image = tk.PhotoImage(file="game/images/bomb.png").subsample(20, 20)
-            self.flag_image = tk.PhotoImage(file="game/images/flag.png").subsample(20, 20)
+            base_path = os.path.dirname(__file__)
+            self.bomb_image = tk.PhotoImage(file=os.path.join(base_path, "images", "bomb.png")).subsample(45, 45)
+            self.flag_image = tk.PhotoImage(file=os.path.join(base_path, "images", "flag.png")).subsample(35, 35)
         except Exception as e:
             print(f"Error loading images: {e}")
             self.bomb_image = None
