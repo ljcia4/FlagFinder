@@ -15,22 +15,26 @@ class Minesweeper:
         self.game_over = False
         self.flags = 0
         self.revealed_cells = 0
+        
+        # NUOVO: Flag per tracciare se è il primo click
+        self.first_click = True
 
         try:
             base_path = os.path.dirname(__file__)
+            # Nota: assicurati che le immagini esistano o il codice userà i fallback testuali
             self.bomb_image = tk.PhotoImage(file=os.path.join(base_path, "images", "bomb.png")).subsample(45, 45)
             self.flag_image = tk.PhotoImage(file=os.path.join(base_path, "images", "flag.png")).subsample(35, 35)
         except Exception as e:
-            print(f"Error loading images: {e}")
+            # print(f"Error loading images: {e}") # Silenziato per pulizia
             self.bomb_image = None
             self.flag_image = None
             
         self.pixel_virtual = tk.PhotoImage(width=1, height=1)
 
         self.create_widgets()
-        self.place_mines()
-        self.calculate_numbers()
         
+        # MODIFICA: Non piazziamo più le mine o calcoliamo i numeri qui.
+        # Lo faremo al primo click.
         self.center_window()
 
     def create_widgets(self):
@@ -63,22 +67,40 @@ class Minesweeper:
                 )
                 btn.pack(fill=tk.BOTH, expand=True)
                 btn.bind('<Button-1>', lambda event, r=r, c=c: self.on_left_click(r, c))
-                btn.bind('<Button-2>', lambda event, r=r, c=c: self.on_right_click(r, c)) # For Mac (sometimes)
-                btn.bind('<Button-3>', lambda event, r=r, c=c: self.on_right_click(r, c)) # For Windows/Linux
+                btn.bind('<Button-2>', lambda event, r=r, c=c: self.on_right_click(r, c))
+                btn.bind('<Button-3>', lambda event, r=r, c=c: self.on_right_click(r, c))
                 self.buttons[(r, c)] = {
                     'btn': btn, 
                     'mine': False, 
                     'value': 0, 
-                    'state': 'hidden' # hidden, revealed, flagged
+                    'state': 'hidden'
                 }
 
-    def place_mines(self):
+    # MODIFICA: Accetta le coordinate "sicure" (il primo click)
+    def place_mines(self, safe_r, safe_c):
+        # Determina le celle da escludere (la cella cliccata e i suoi vicini per garantire un'apertura)
+        # Se vuoi che SOLO la cella cliccata sia sicura, rimuovi il ciclo for e lascia solo safe_cells.add((safe_r, safe_c))
+        safe_cells = set()
+        for i in range(max(0, safe_r-1), min(self.rows, safe_r+2)):
+            for j in range(max(0, safe_c-1), min(self.cols, safe_c+2)):
+                safe_cells.add((i, j))
+
+        # Controllo di sicurezza: se le mine sono troppe rispetto allo spazio disponibile
+        available_spots = (self.rows * self.cols) - len(safe_cells)
+        if self.mines > available_spots:
+            print("Warning: Too many mines for guaranteed safe start. Reducing safe area.")
+            safe_cells = {(safe_r, safe_c)} # Riduciamo l'area sicura solo alla cella cliccata
+
         while len(self.mine_positions) < self.mines:
             r = random.randint(0, self.rows - 1)
             c = random.randint(0, self.cols - 1)
-            if (r, c) not in self.mine_positions:
-                self.mine_positions.add((r, c))
-                self.buttons[(r, c)]['mine'] = True
+            
+            # Se la posizione è nell'area sicura o c'è già una mina, salta
+            if (r, c) in safe_cells or (r, c) in self.mine_positions:
+                continue
+                
+            self.mine_positions.add((r, c))
+            self.buttons[(r, c)]['mine'] = True
 
     def calculate_numbers(self):
         for r in range(self.rows):
@@ -99,6 +121,12 @@ class Minesweeper:
         if cell['state'] == 'flagged' or cell['state'] == 'revealed':
             return
 
+        #Generazione Post-Factum
+        if self.first_click:
+            self.place_mines(r, c)      # Piazza le mine escludendo (r, c) e vicini
+            self.calculate_numbers()    # Calcola i numeri ora che le mine ci sono
+            self.first_click = False    # Disabilita il flag
+
         if cell['mine']:
             self.game_over_loss()
         else:
@@ -116,13 +144,13 @@ class Minesweeper:
         if cell['state'] == 'hidden':
             cell['state'] = 'flagged'
             if self.flag_image:
-                btn.config(image=self.flag_image, width=30, height=30) # Adjust size match
+                btn.config(image=self.flag_image, width=30, height=30)
             else:
                 btn.config(text='🚩', fg='red', image=self.pixel_virtual, width=30, height=30)
             self.flags += 1
         elif cell['state'] == 'flagged':
             cell['state'] = 'hidden'
-            btn.config(image=self.pixel_virtual, width=30, height=30) # Reset to text mode dimensions
+            btn.config(image=self.pixel_virtual, width=30, height=30)
             btn.config(text='')
             self.flags -= 1
         
@@ -146,7 +174,6 @@ class Minesweeper:
             colors = {1: 'blue', 2: 'green', 3: 'red', 4: 'darkblue', 5: 'darkred', 6: 'teal', 7: 'black', 8: 'gray'}
             btn.config(text=str(val), fg=colors.get(val, 'black'))
         else:
-            # Recursive reveal for empty cells
             for i in range(max(0, r-1), min(self.rows, r+2)):
                 for j in range(max(0, c-1), min(self.cols, c+2)):
                     if i != r or j != c:
